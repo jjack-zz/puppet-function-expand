@@ -1,22 +1,9 @@
-## expander - take a string and auto-magic it into an array
-##
-## the old way:
-## $servers = ["server1.domain.com","server2.domain.com",...]
-## $servers = ["server01.domain.com","server02.domain.com",...]
-##
-## the expander way:
-## $servers = expander("server[1..20].domain.com")
-## $servers = expander("server[01..20].domain.com")
-## $servers = expander("server[01..17,18..20].domain.com")
-## $servers = expander("server[a..f].domain.com")
-## $servers = expander("server[01..06,7..10,a..b,A..C].domain.com")
-##
 module Puppet::Parser::Functions
     newfunction(:expander, :type => :rvalue) do |args|
 
         items = Array.new
         args.each { |arg|
-            items.push( process( arg ) )
+            items.push( expand( arg ) )
         }
 
         return items
@@ -24,38 +11,41 @@ module Puppet::Parser::Functions
     end
 end
 
-# process - handles the input and output of expand
-# takes a string with a bracketed list and expands the list
-def process(item)
+# take an item with a bracketed list and expands the list
+def expand(item)
 
-    # strip any spaces
+    # strip out any spaces
     item = item.gsub(/\s+/,'')
 
     # swap [...] with %s for output formatting
     new_format = item.sub(/\[[a-zA-Z0-9\.\,]+\]/,'%s')
 
-    # grab the values from the [...] group and process them
-    values = Array.new
-    expand( item.scan(/\[([a-zA-Z0-9\.\,]+)\]/).flatten[0] ).each { |value|
-        values.push( sprintf new_format, value )
-    }
+    # was anything swapped out?
+    if new_format != item
+        # grab the values from the [...] group and process them
+        values = Array.new
+        process( item.scan(/\[([a-zA-Z0-9\.\,]+)\]/).flatten[0] ).each { |value|
+            values.push( sprintf new_format, value )
+        }
 
-    return values
-
+        return values
+    else
+        # there was nothing to swap out
+        return item
+    end
 end
 
-# expand - the meat
-# it takes a comma-separated list of values and iterates over them
-# 00..02,3..6,7,8..10,a..c
-def expand(ranges)
+# take a comma-separated list of values and iterates over them
+def process(ranges)
 
-    # split up the list into individual ranges to traverse
-    numbers = Array.new
+    processed = Array.new
+
+    # split the list into individual ranges to traverse
     ranges.split(',').each{ |range|
 
         if range.match(/^[a-zA-Z0-9]+$/)
             # a single number in the list can just be added to the results
-            numbers.push(range)
+            processed.push(range)
 
         elsif m = range.match(/^([a-zA-Z0-9]+)\.\.([a-zA-Z0-9]+)$/)
             # if this matched, the elements of the range will be in m[1] and m[2]
@@ -71,19 +61,18 @@ def expand(ranges)
 
                 # iterate through this range
                 m[1].to_i.upto( m[2].to_i ) { |number|
-                    numbers.push(sprintf "%0#{leading_zeroes}i", number)
+                    processed.push(sprintf "%0#{leading_zeroes}i", number)
                 }
             else
                 # iterating over letters doesn't require anything special
                 # just count on up to m[2]
                 m[1].upto( m[2] ) { |number|
-                    numbers.push(number)
+                    processed.push(number)
                 }
             end
         else
             raise Puppet::ParseError, "Range #{range} is in an invalid or unsupported format"
         end
     }
-    
-    return numbers
+    return processed
 end
