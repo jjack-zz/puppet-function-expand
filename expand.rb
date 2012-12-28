@@ -1,5 +1,5 @@
 module Puppet::Parser::Functions
-    newfunction(:expander, :type => :rvalue) do |args|
+    newfunction(:expand, :type => :rvalue) do |args|
 
         items = Array.new
         args.each { |arg|
