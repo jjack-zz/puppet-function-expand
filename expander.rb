@@ -29,7 +29,7 @@ end
 def process(item)
 
     # strip any spaces
-    item = item.gsub(/s+/,'')
+    item = item.gsub(/\s+/,'')
 
     # swap [...] with %s for output formatting
     new_format = item.sub(/\[[a-zA-Z0-9\.\,]+\]/,'%s')
